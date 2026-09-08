@@ -505,8 +505,8 @@ export default function Dashboard() {
                 </select>
               </div>
               
-              {(searchTerm || filterCampaign.length > 0 || filterLinkName.length > 0 || filterSource.length > 0 || filterMedium.length > 0 || filterTag.length > 0) && (
-                <button onClick={() => { setSearchTerm(""); setFilterCampaign([]); setFilterLinkName([]); setFilterSource([]); setFilterMedium([]); setFilterTag([]); }} className="text-sm font-public font-bold text-fava-red hover:text-fava-darkred hover:underline px-2 transition-all">
+              {(searchTerm || filterCampaign.length > 0 || filterLinkName.length > 0 || filterSource.length > 0 || filterMedium.length > 0 || filterTag.length > 0 || filterType.length > 0) && (
+                <button onClick={() => { setSearchTerm(""); setFilterCampaign([]); setFilterLinkName([]); setFilterSource([]); setFilterMedium([]); setFilterTag([]); setFilterType([]); }} className="text-sm font-public font-bold text-fava-red hover:text-fava-darkred hover:underline px-2 transition-all">
                   Limpiar Filtros
                 </button>
               )}
