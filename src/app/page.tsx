@@ -166,15 +166,6 @@ export default function Dashboard() {
     if (filterSource.length > 0) filtered = filtered.filter(l => filterSource.includes(l.source.name));
     if (filterMedium.length > 0) filtered = filtered.filter(l => filterMedium.includes(l.medium.name));
     if (filterTag.length > 0) filtered = filtered.filter(l => l.tags && l.tags.some(t => filterTag.includes(t)));
-    if (filterType.length > 0) {
-      filtered = filtered.filter(l => {
-        const hasBitly = !!l.bitlyUrl && l.bitlyUrl !== "null" && l.bitlyUrl !== "undefined" && l.bitlyUrl !== "";
-        if (filterType.includes("UTM") && l.utmUrl) return true;
-        if (filterType.includes("Bitly") && hasBitly) return true;
-        if (filterType.includes("QR") && l.hasQR) return true;
-        return false;
-      });
-    }
 
     const campaignsMap = new Map();
 
@@ -605,49 +596,54 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* UTM */}
-                                    <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
-                                      <input 
-                                        type="checkbox" 
-                                        className="w-4 h-4 accent-fava-red cursor-pointer"
-                                        checked={selectedItems.includes(medium.id)}
-                                        onChange={() => toggleSelect(medium.id)}
-                                      />
-                                      <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">UTM</span>
-                                      <span className="text-xs font-public text-fava-mediumgray truncate group-hover:text-fava-darkgray transition-colors flex-1" title={medium.utm}>
-                                        {medium.utm}
-                                      </span>
-                                      <InlineCopyButton text={medium.utm} />
-                                    </div>
+                                    {(filterType.length === 0 || filterType.includes("UTM")) && (
+                                      <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
+                                        <input 
+                                          type="checkbox" 
+                                          className="w-4 h-4 accent-fava-red cursor-pointer"
+                                          checked={selectedItems.includes(medium.id)}
+                                          onChange={() => toggleSelect(medium.id)}
+                                        />
+                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">UTM</span>
+                                        <span className="text-xs font-public text-fava-mediumgray truncate group-hover:text-fava-darkgray transition-colors flex-1" title={medium.utm}>
+                                          {medium.utm}
+                                        </span>
+                                        <InlineCopyButton text={medium.utm} />
+                                      </div>
+                                    )}
 
                                     {/* BITLY */}
-                                    <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
-                                      <input 
-                                        type="checkbox" 
-                                        className="w-4 h-4 accent-fava-red cursor-pointer"
-                                        checked={selectedItems.includes(`${medium.id}-bitly`)}
-                                        onChange={() => toggleSelect(`${medium.id}-bitly`)}
-                                        disabled={!medium.bitly}
-                                      />
-                                      <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">Bitly</span>
-                                      {medium.bitly ? (
-                                        <>
-                                          <span className="text-xs font-public text-fava-mediumgray truncate group-hover:text-fava-darkgray transition-colors flex-1" title={medium.bitly}>
-                                            {medium.bitly}
-                                          </span>
-                                          <InlineCopyButton text={medium.bitly} />
-                                        </>
-                                      ) : (
-                                        <div className="flex-1">
-                                          <button onClick={() => handleGenerateBitly(medium, campaign.name, link.name, source.name)} className="px-3 py-1 border border-dashed border-fava-lightgray rounded font-public font-semibold text-[10px] text-fava-darkgray hover:bg-fava-lightgray/20 transition-colors flex items-center gap-1">
-                                            <Plus size={12}/> Generar Bitly
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
+                                    {(filterType.length === 0 || filterType.includes("Bitly")) && (
+                                      <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
+                                        <input 
+                                          type="checkbox" 
+                                          className="w-4 h-4 accent-fava-red cursor-pointer"
+                                          checked={selectedItems.includes(`${medium.id}-bitly`)}
+                                          onChange={() => toggleSelect(`${medium.id}-bitly`)}
+                                          disabled={!medium.bitly}
+                                        />
+                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">Bitly</span>
+                                        {medium.bitly ? (
+                                          <>
+                                            <span className="text-xs font-public text-fava-mediumgray truncate group-hover:text-fava-darkgray transition-colors flex-1" title={medium.bitly}>
+                                              {medium.bitly}
+                                            </span>
+                                            <InlineCopyButton text={medium.bitly} />
+                                          </>
+                                        ) : (
+                                          <div className="flex-1">
+                                            <button onClick={() => handleGenerateBitly(medium, campaign.name, link.name, source.name)} className="px-3 py-1 border border-dashed border-fava-lightgray rounded font-public font-semibold text-[10px] text-fava-darkgray hover:bg-fava-lightgray/20 transition-colors flex items-center gap-1">
+                                              <Plus size={12}/> Generar Bitly
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
 
                                     {/* QR */}
-                                    <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
-                                      <input 
+                                    {(filterType.length === 0 || filterType.includes("QR")) && (
+                                      <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
+                                        <input 
                                         type="checkbox" 
                                         className="w-4 h-4 accent-fava-red cursor-pointer"
                                         checked={selectedItems.includes(`${medium.id}-qr`)}
@@ -661,6 +657,7 @@ export default function Dashboard() {
                                         <Download size={12}/> Descargar
                                       </button>
                                     </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
