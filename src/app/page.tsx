@@ -168,8 +168,9 @@ export default function Dashboard() {
     if (filterTag.length > 0) filtered = filtered.filter(l => l.tags && l.tags.some(t => filterTag.includes(t)));
     if (filterType.length > 0) {
       filtered = filtered.filter(l => {
+        const hasBitly = !!l.bitlyUrl && l.bitlyUrl !== "null" && l.bitlyUrl !== "undefined" && l.bitlyUrl !== "";
         if (filterType.includes("UTM") && l.utmUrl) return true;
-        if (filterType.includes("Bitly") && l.bitlyUrl) return true;
+        if (filterType.includes("Bitly") && hasBitly) return true;
         if (filterType.includes("QR") && l.hasQR) return true;
         return false;
       });
