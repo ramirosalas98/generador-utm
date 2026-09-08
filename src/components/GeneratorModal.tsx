@@ -515,7 +515,7 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
 
   const canGenerate = linkEntries.length > 0 && 
                       selectedCampaigns.length > 0 && 
-                      sourceModules.length > 0 && sourceModules.every(m => (m.sourceId !== "" || (m.sourceId === "new" && m.newSourceName.trim() !== "")) && (m.selectedMediums.length > 0 || m.newMediums.length > 0));
+                      sourceModules.length > 0 && sourceModules.every(m => m.sourceId && (m.sourceId !== "new" || m.newSourceName.trim() !== "") && (m.selectedMediums.length > 0 || m.newMediums.length > 0));
   const uniqueCombosMap = availableCombinations.reduce((acc, c) => {
     if (!acc[c.sourceName]) acc[c.sourceName] = [];
     acc[c.sourceName].push(c);
