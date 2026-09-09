@@ -1,4 +1,10 @@
 import { NextResponse } from 'next/server';
+import { jwtVerify, createRemoteJWKSet } from 'jose';
+
+// Conjunto de claves públicas oficiales de Google para validar tokens de Firebase Auth
+const JWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
+);
 
 export async function POST(request: Request) {
   try {
@@ -8,25 +14,24 @@ export async function POST(request: Request) {
     }
 
     const token = authHeader.split('Bearer ')[1];
-    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "Error de configuración: NEXT_PUBLIC_FIREBASE_API_KEY no encontrada." }, { status: 500 });
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      return NextResponse.json({ error: "Error de configuración: NEXT_PUBLIC_FIREBASE_PROJECT_ID no configurado." }, { status: 500 });
     }
 
-    // Verificar ID token contra el Identity Toolkit de Firebase de Google directamente (sin dependencias problemáticas de Node ESM/CJS)
-    const verifyRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: token })
-    });
-
-    const verifyData = await verifyRes.json();
-    if (!verifyRes.ok || !verifyData.users || verifyData.users.length === 0) {
-      console.error("Token verification failed:", verifyData);
+    let payload: any;
+    try {
+      const result = await jwtVerify(token, JWKS, {
+        issuer: `https://securetoken.google.com/${projectId}`,
+        audience: projectId,
+      });
+      payload = result.payload;
+    } catch (err: any) {
+      console.error("Token verification failed:", err);
       return NextResponse.json({ error: "No autorizado. Token inválido o expirado." }, { status: 401 });
     }
 
-    const email = (verifyData.users[0].email || "").toLowerCase();
+    const email = (payload.email || "").toLowerCase();
     const allowedEmailsStr = process.env.NEXT_PUBLIC_ALLOWED_EMAILS || "";
     const allowedEmails = allowedEmailsStr.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
     
