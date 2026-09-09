@@ -26,14 +26,19 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // Validar el dominio de FAVA
-        if (currentUser.email && currentUser.email.endsWith("@grupofava.com.ar")) {
+        const email = currentUser.email?.toLowerCase() || "";
+        // Leemos los correos permitidos de la variable de entorno y los separamos por coma
+        const allowedEmailsStr = process.env.NEXT_PUBLIC_ALLOWED_EMAILS || "";
+        const allowedEmails = allowedEmailsStr.split(",").map(e => e.trim().toLowerCase());
+
+        // Validar si el correo está en la lista de permitidos
+        if (allowedEmails.includes(email)) {
           setUser(currentUser);
         } else {
-          // Si no es de FAVA, lo deslogueamos
+          // Si no está en la lista, lo deslogueamos
           await signOut(auth);
           setUser(null);
-          alert("Acceso denegado. Solo se permiten correos de @grupofava.com.ar");
+          alert(`Acceso denegado. El correo ${email} no tiene permisos para ingresar.`);
         }
       } else {
         setUser(null);

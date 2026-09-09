@@ -14,11 +14,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Error de configuración de seguridad del servidor." }, { status: 500 });
     }
     
+    let decodedToken;
     try {
-      await adminAuth.verifyIdToken(token);
+      decodedToken = await adminAuth.verifyIdToken(token);
     } catch (error) {
       console.error("Token verification failed:", error);
       return NextResponse.json({ error: "No autorizado. Token inválido." }, { status: 401 });
+    }
+
+    const email = decodedToken.email?.toLowerCase() || "";
+    const allowedEmailsStr = process.env.NEXT_PUBLIC_ALLOWED_EMAILS || "";
+    const allowedEmails = allowedEmailsStr.split(",").map(e => e.trim().toLowerCase());
+    if (!allowedEmails.includes(email)) {
+      return NextResponse.json({ error: "No autorizado. Correo sin permisos." }, { status: 403 });
     }
 
     const { long_url, title } = await request.json();
