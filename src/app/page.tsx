@@ -88,6 +88,7 @@ export default function Dashboard() {
   const [linksData, setLinksData] = useState<GeneratedLink[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"month" | "generic">("month");
 
   const months = [
     subMonths(currentDate, 2),
@@ -97,7 +98,7 @@ export default function Dashboard() {
     addMonths(currentDate, 2)
   ];
   
-  const selectedMonthLabel = getMonthLabel(currentDate);
+  const selectedMonthLabel = viewMode === "generic" ? "UTM Genéricas" : getMonthLabel(currentDate);
 
   useEffect(() => {
     const q = query(collection(db, "generated_links"), orderBy("createdAt", "desc"));
@@ -480,23 +481,32 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-6 pb-24">
-      {/* 1. Selector de Tiempo */}
-      <div className="flex items-center justify-center gap-6 pb-6 mt-4">
-        <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-2 text-fava-mediumgray hover:text-fava-red"><ChevronDown className="rotate-90" size={16}/></button>
-        {months.map(date => {
-          const lbl = getMonthLabel(date);
-          const isSelected = date.getTime() === currentDate.getTime();
-          return (
-            <div 
-              key={lbl} 
-              onClick={() => setCurrentDate(date)}
-              className={`px-6 py-2 font-satoshi font-bold cursor-pointer rounded-full transition-colors ${isSelected ? 'text-fava-white bg-fava-red shadow-[0_0_15px_rgba(229,41,41,0.5)]' : 'text-fava-mediumgray hover:text-fava-darkgray'}`}
-            >
-              {lbl}
-            </div>
-          );
-        })}
-        <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-2 text-fava-mediumgray hover:text-fava-red"><ChevronDown className="-rotate-90" size={16}/></button>
+      {/* 1. Selector de Tiempo y Modo */}
+      <div className="flex flex-col items-center gap-4 mt-4 pb-4">
+        <div className="flex items-center justify-center gap-6">
+          <button onClick={() => { setViewMode("month"); setCurrentDate(subMonths(currentDate, 1)); }} className="p-2 text-fava-mediumgray hover:text-fava-red transition-colors"><ChevronDown className="rotate-90" size={16}/></button>
+          {months.map(date => {
+            const lbl = getMonthLabel(date);
+            const isSelected = viewMode === "month" && date.getTime() === currentDate.getTime();
+            return (
+              <div 
+                key={lbl} 
+                onClick={() => { setViewMode("month"); setCurrentDate(date); }}
+                className={`px-6 py-2 font-satoshi font-bold cursor-pointer rounded-full transition-all ${isSelected ? 'text-fava-white bg-fava-red shadow-[0_0_15px_rgba(229,41,41,0.5)]' : 'text-fava-mediumgray hover:text-fava-darkgray hover:bg-fava-lightgray/10'}`}
+              >
+                {lbl}
+              </div>
+            );
+          })}
+          <button onClick={() => { setViewMode("month"); setCurrentDate(addMonths(currentDate, 1)); }} className="p-2 text-fava-mediumgray hover:text-fava-red transition-colors"><ChevronDown className="-rotate-90" size={16}/></button>
+        </div>
+        
+        <button 
+          onClick={() => setViewMode("generic")}
+          className={`px-6 py-2 font-satoshi font-bold cursor-pointer rounded-full transition-all border ${viewMode === 'generic' ? 'text-fava-white bg-fava-red border-fava-red shadow-[0_0_15px_rgba(229,41,41,0.5)]' : 'text-fava-mediumgray border-fava-lightgray hover:border-fava-red hover:text-fava-darkgray'}`}
+        >
+          UTM Genéricas
+        </button>
       </div>
 
       {/* 2. Panel de Filtros y Botón */}
