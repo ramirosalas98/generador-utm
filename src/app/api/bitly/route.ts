@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "BITLY_ACCESS_TOKEN no configurado" }, { status: 500 });
     }
 
-    const response = await fetch("https://api-ssl.bitly.com/v4/shorten", {
+    const response = await fetch("https://api-ssl.bitly.com/v4/bitlinks", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
