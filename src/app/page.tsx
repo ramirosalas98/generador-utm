@@ -403,9 +403,15 @@ export default function Dashboard() {
     let ids: string[] = [];
     
     const addMediumIds = (m: any) => {
-       ids.push(m.id);
-       if (m.bitly) ids.push(`${m.id}-bitly`);
-       ids.push(`${m.id}-qr`);
+       if (filterType.length === 0 || filterType.includes("UTM")) {
+         ids.push(m.id);
+       }
+       if (filterType.length === 0 || filterType.includes("Bitly")) {
+         if (m.bitly) ids.push(`${m.id}-bitly`);
+       }
+       if (filterType.length === 0 || filterType.includes("QR")) {
+         ids.push(`${m.id}-qr`);
+       }
     };
 
     if (nodeType === 'campaign') {
