@@ -321,14 +321,22 @@ export default function Dashboard() {
         },
         body: JSON.stringify({ long_url: medium.utm, title })
       });
-      const data = await res.json();
+
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Respuesta inválida del servidor (${res.status} ${res.statusText})`);
+      }
+
       if (res.ok && data.link) {
         await updateDoc(doc(db, "generated_links", medium.id), { bitlyUrl: data.link });
       } else {
         alert("Error de Bitly: " + (data.error || "Desconocido"));
       }
-    } catch(e) {
-      alert("Error al generar Bitly");
+    } catch(e: any) {
+      console.error("Error al generar Bitly:", e);
+      alert("Error al generar Bitly: " + (e?.message || e));
     }
   };
 
