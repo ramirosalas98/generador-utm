@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Plus, Check, Trash2, ChevronDown, Download, Copy, Link as LinkIcon, RefreshCw } from "lucide-react";
 import { getConfigItems, ConfigItem, saveGeneratedLink, addConfigItem } from "@/lib/db";
+import { auth } from "@/lib/firebase";
 import { COMPLEMENTARY_COLORS } from "@/lib/colors";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -407,9 +408,13 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
               let bitlyUrl = null;
               if (generateBitly && bitlySelections[key]) {
                 try {
+                  const token = await auth.currentUser?.getIdToken();
                   const res = await fetch("/api/bitly", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                      "Content-Type": "application/json",
+                      "Authorization": token ? `Bearer ${token}` : ""
+                    },
                     body: JSON.stringify({
                       long_url: url.toString(),
                       title: `${finalCamp.name} - ${link.name} - ${mod.sourceName} - ${med.name}`

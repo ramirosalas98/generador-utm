@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Search, ChevronDown, ChevronRight, Copy, Download, Plus, X, Eye, RefreshCw, Loader2 } from "lucide-react";
 import { collection, query, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { GeneratedLink, getConfigItems } from "@/lib/db";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import GeneratorModal from "@/components/GeneratorModal";
 
 import { format, addMonths, subMonths } from "date-fns";
@@ -307,10 +307,18 @@ export default function Dashboard() {
 
   const handleGenerateBitly = async (medium: any, campaignName: string, linkName: string, sourceName: string) => {
     try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        alert("Error: No estás autenticado.");
+        return;
+      }
       const title = `${campaignName} - ${linkName} - ${sourceName} - ${medium.name}`;
       const res = await fetch("/api/bitly", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ long_url: medium.utm, title })
       });
       const data = await res.json();
