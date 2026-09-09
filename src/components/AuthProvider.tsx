@@ -38,7 +38,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           // Si no está en la lista, lo deslogueamos
           await signOut(auth);
           setUser(null);
-          alert(`Acceso denegado. El correo ${email} no tiene permisos para ingresar.`);
+          alert("Acceso denegado: comunicate con el equipo de Marketing para solicitar acceso");
         }
       } else {
         setUser(null);
