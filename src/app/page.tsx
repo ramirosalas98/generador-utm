@@ -678,18 +678,20 @@ export default function Dashboard() {
       {selectedItems.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-fava-darkgray rounded-xl shadow-fava-elevation px-6 py-4 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-5">
           <span className="font-public font-medium text-fava-white">
-            {selectedItems.length} elementos seleccionados
+            {selectedItems.filter(id => !hierarchicalData.some(c => c.id === id) && !hierarchicalData.some(c => c.links.some((l:any) => l.id === id)) && !hierarchicalData.some(c => c.links.some((l:any) => l.sources.some((s:any) => s.id === id)))).length} elementos seleccionados
           </span>
           <div className="flex items-center gap-3 border-l border-fava-mediumgray/30 pl-6">
-            <button onClick={handleCopyLinks} className="px-4 py-2 border border-fava-mediumgray/50 rounded text-fava-white font-public font-semibold text-sm flex items-center gap-2 hover:bg-fava-red transition-colors min-w-[150px] justify-center">
+            <button onClick={handleCopyLinks} className="px-4 py-2 border border-fava-mediumgray/50 rounded text-fava-white font-public font-semibold text-sm flex items-center gap-2 hover:bg-fava-red transition-colors min-w-[150px] justify-center whitespace-nowrap">
               {copiedLinks ? "✓ Copiado" : "Copiar solo links"}
             </button>
-            <button onClick={handleCopyNamesAndLinks} className="px-4 py-2 border border-fava-mediumgray/50 rounded text-fava-white font-public font-semibold text-sm flex items-center gap-2 hover:bg-fava-red transition-colors min-w-[200px] justify-center">
+            <button onClick={handleCopyNamesAndLinks} className="px-4 py-2 border border-fava-mediumgray/50 rounded text-fava-white font-public font-semibold text-sm flex items-center gap-2 hover:bg-fava-red transition-colors min-w-[200px] justify-center whitespace-nowrap">
               {copiedNames ? "✓ Copiado" : "Copiar Nombres + Links"}
             </button>
-            <button onClick={() => handleDownloadQRs(selectedItems)} className="px-4 py-2 bg-fava-red rounded text-fava-white font-satoshi font-bold text-sm flex items-center gap-2 hover:bg-fava-darkred transition-colors shadow-md">
-              <Download size={16}/> Descargar QRs
-            </button>
+            {selectedItems.some(id => id.endsWith('-qr')) && (
+              <button onClick={() => handleDownloadQRs(selectedItems)} className="px-4 py-2 bg-fava-red rounded text-fava-white font-satoshi font-bold text-sm flex items-center gap-2 hover:bg-fava-darkred transition-colors shadow-md whitespace-nowrap">
+                <Download size={16}/> Descargar QRs
+              </button>
+            )}
             
             <div className="w-px h-8 bg-fava-mediumgray/30 mx-2"></div>
             
