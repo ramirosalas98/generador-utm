@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, ChevronDown, ChevronRight, Copy, Download, Plus, X } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Copy, Download, Plus, X, Eye, RefreshCw, Loader2 } from "lucide-react";
 import { collection, query, orderBy, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { GeneratedLink, getConfigItems } from "@/lib/db";
 import { db } from "@/lib/firebase";
@@ -205,6 +205,7 @@ export default function Dashboard() {
         utm: link.utmUrl,
         bitly: link.bitlyUrl,
         hasQR: link.hasQR,
+        qrSource: link.qrSource,
         createdAt: link.createdAt
       });
     });
@@ -325,6 +326,44 @@ export default function Dashboard() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [pendingQrTargets, setPendingQrTargets] = useState<any[]>([]);
 
+  // Single QR State
+  const [singleQrModal, setSingleQrModal] = useState<{
+    isOpen: boolean;
+    step: 'choice' | 'generating' | 'preview';
+    medium: any | null;
+    qrDataUrl: string | null;
+  }>({ isOpen: false, step: 'choice', medium: null, qrDataUrl: null });
+
+  const openSingleQrChoice = (medium: any) => {
+    if (!medium.bitly) {
+      executeSingleQr(medium, 'utm');
+    } else {
+      setSingleQrModal({ isOpen: true, step: 'choice', medium, qrDataUrl: null });
+    }
+  };
+
+  const openSingleQrPreview = async (medium: any) => {
+    setSingleQrModal({ isOpen: true, step: 'generating', medium, qrDataUrl: null });
+    const url = medium.qrSource === 'bitly' && medium.bitly ? medium.bitly : medium.utm;
+    const dataUrl = await QRCode.toDataURL(url, { width: 512, margin: 2 });
+    setSingleQrModal({ isOpen: true, step: 'preview', medium, qrDataUrl: dataUrl });
+  };
+
+  const executeSingleQr = async (medium: any, choice: 'bitly' | 'utm') => {
+    setSingleQrModal(prev => ({ ...prev, isOpen: true, step: 'generating', medium }));
+    const url = choice === 'bitly' && medium.bitly ? medium.bitly : medium.utm;
+    
+    // Simulate generation time to show the progress bar (optional, but requested by user to feel natural)
+    await new Promise(r => setTimeout(r, 600)); 
+    
+    const dataUrl = await QRCode.toDataURL(url, { width: 512, margin: 2 });
+    
+    const docRef = doc(db, "generated_links", medium.id);
+    await updateDoc(docRef, { hasQR: true, qrSource: choice });
+    
+    setSingleQrModal(prev => ({ ...prev, step: 'preview', qrDataUrl: dataUrl }));
+  };
+
   const handleDownloadQRs = async (selectedIds: string[]) => {
     if (selectedIds.length === 0) return;
     
@@ -372,7 +411,7 @@ export default function Dashboard() {
       saveAs(dataUrl, `${fileName}.png`);
       
       const docRef = doc(db, "generated_links", rawTargets[0].id);
-      await updateDoc(docRef, { hasQR: true });
+      await updateDoc(docRef, { hasQR: true, qrSource: preferBitly && rawTargets[0].bitly ? 'bitly' : 'utm' });
     } else {
       const zip = new JSZip();
       for (const item of rawTargets) {
@@ -384,7 +423,7 @@ export default function Dashboard() {
         zip.file(`${fileName}.png`, base64Data, { base64: true });
         
         const docRef = doc(db, "generated_links", item.id);
-        await updateDoc(docRef, { hasQR: true });
+        await updateDoc(docRef, { hasQR: true, qrSource: preferBitly && item.bitly ? 'bitly' : 'utm' });
       }
       const content = await zip.generateAsync({ type: "blob" });
       saveAs(content, "Codigos_QR.zip");
@@ -650,19 +689,37 @@ export default function Dashboard() {
                                     {(filterType.length === 0 || filterType.includes("QR")) && (
                                       <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
                                         <input 
-                                        type="checkbox" 
-                                        className="w-4 h-4 accent-fava-red cursor-pointer"
-                                        checked={selectedItems.includes(`${medium.id}-qr`)}
-                                        onChange={() => toggleSelect(`${medium.id}-qr`)}
-                                      />
-                                      <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">QR</span>
-                                      <span className="text-xs font-public text-fava-mediumgray flex-1">
-                                        {medium.hasQR ? 'QR Generado' : 'Generar QR sobre la marcha'}
-                                      </span>
-                                      <button onClick={() => handleDownloadQRs([medium.id])} className={`px-3 py-1 border border-fava-lightgray rounded font-public font-semibold text-[10px] transition-colors flex items-center gap-1 ${medium.hasQR ? 'text-fava-red bg-fava-lightred/10 border-fava-red/20 hover:bg-fava-lightred/20' : 'text-fava-darkgray hover:bg-fava-lightgray/20'}`}>
-                                        <Download size={12}/> Descargar
-                                      </button>
-                                    </div>
+                                          type="checkbox" 
+                                          className="w-4 h-4 accent-fava-red cursor-pointer"
+                                          checked={selectedItems.includes(`${medium.id}-qr`)}
+                                          onChange={() => toggleSelect(`${medium.id}-qr`)}
+                                        />
+                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">QR</span>
+                                        {medium.hasQR ? (
+                                          <>
+                                            <span className="text-xs font-public text-fava-mediumgray flex-1">
+                                              QR generado sobre {medium.qrSource === 'bitly' ? 'Bitly' : 'UTM'}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                              <button onClick={() => openSingleQrPreview(medium)} className="p-1.5 text-fava-darkgray hover:bg-fava-lightgray/30 rounded transition-colors" title="Ver QR">
+                                                <Eye size={14}/>
+                                              </button>
+                                              <button onClick={() => openSingleQrChoice(medium)} className="p-1.5 text-fava-darkgray hover:bg-fava-lightgray/30 rounded transition-colors" title="Rehacer QR">
+                                                <RefreshCw size={14}/>
+                                              </button>
+                                              <button onClick={() => handleDownloadQRs([medium.id])} className="px-3 py-1 border border-fava-lightgray rounded font-public font-semibold text-[10px] transition-colors flex items-center gap-1 text-fava-red bg-fava-lightred/10 border-fava-red/20 hover:bg-fava-lightred/20 whitespace-nowrap">
+                                                <Download size={12}/> Descargar
+                                              </button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="flex-1">
+                                            <button onClick={() => openSingleQrChoice(medium)} className="px-3 py-1 border border-dashed border-fava-lightgray rounded font-public font-semibold text-[10px] text-fava-darkgray hover:bg-fava-lightgray/20 transition-colors flex items-center gap-1 w-max">
+                                              <Plus size={12}/> Generar QR
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 ))}
@@ -740,6 +797,92 @@ export default function Dashboard() {
             >
               Cancelar descarga
             </button>
+          </div>
+        </div>
+      )}
+
+      {singleQrModal.isOpen && singleQrModal.medium && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-fava-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-6 animate-in zoom-in-95">
+            
+            {singleQrModal.step === 'choice' && (
+              <>
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-xl font-satoshi font-bold text-fava-darkgray">¿Sobre qué enlace querés hacer el QR?</h3>
+                  <p className="font-public text-sm text-fava-mediumgray">
+                    Este link tiene una versión corta de Bitly. ¿Preferís que el código QR apunte al Bitly o a la UTM original?
+                  </p>
+                </div>
+                
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={() => executeSingleQr(singleQrModal.medium, 'bitly')}
+                    className="w-full py-3 px-4 bg-fava-red hover:bg-fava-darkred text-fava-white font-satoshi font-bold rounded-xl transition-colors flex items-center justify-between group"
+                  >
+                    <span>Bitly</span>
+                    <ChevronRight size={18} className="opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </button>
+                  <button 
+                    onClick={() => executeSingleQr(singleQrModal.medium, 'utm')}
+                    className="w-full py-3 px-4 bg-fava-lightgray/30 hover:bg-fava-lightgray border border-fava-lightgray text-fava-darkgray font-satoshi font-bold rounded-xl transition-colors flex items-center justify-between group"
+                  >
+                    <span>UTM</span>
+                    <ChevronRight size={18} className="text-fava-mediumgray group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+                <button 
+                  onClick={() => setSingleQrModal({ isOpen: false, step: 'choice', medium: null, qrDataUrl: null })}
+                  className="mt-2 text-center text-sm font-public font-bold text-fava-mediumgray hover:text-fava-darkgray"
+                >
+                  Cancelar
+                </button>
+              </>
+            )}
+
+            {singleQrModal.step === 'generating' && (
+              <div className="flex flex-col items-center justify-center gap-4 py-8">
+                <Loader2 className="animate-spin text-fava-red" size={40} />
+                <p className="font-satoshi font-bold text-fava-darkgray">Generando código QR...</p>
+              </div>
+            )}
+
+            {singleQrModal.step === 'preview' && (
+              <div className="flex flex-col gap-4 items-center">
+                <h3 className="text-lg font-satoshi font-bold text-fava-darkgray w-full text-left">Vista previa del QR</h3>
+                
+                {singleQrModal.qrDataUrl && (
+                  <div className="p-4 bg-fava-lightgray/10 border border-fava-lightgray rounded-xl">
+                    <img src={singleQrModal.qrDataUrl} alt="QR Preview" className="w-48 h-48" />
+                  </div>
+                )}
+                
+                <p className="text-xs font-public text-fava-mediumgray text-center px-4">
+                  QR generado sobre la versión {singleQrModal.medium.qrSource === 'bitly' ? 'corta (Bitly)' : 'larga (UTM)'}
+                </p>
+
+                <div className="flex w-full gap-3 mt-2">
+                  <button 
+                    onClick={() => openSingleQrChoice(singleQrModal.medium)} 
+                    className="flex-1 py-2.5 bg-fava-lightgray/30 hover:bg-fava-lightgray border border-fava-lightgray text-fava-darkgray font-satoshi font-bold rounded-xl transition-colors flex justify-center items-center gap-2"
+                  >
+                    <RefreshCw size={16} /> Rehacer
+                  </button>
+                  <button 
+                    onClick={() => saveAs(singleQrModal.qrDataUrl!, `${singleQrModal.medium.name}_QR.png`)} 
+                    className="flex-1 py-2.5 bg-fava-red hover:bg-fava-darkred text-fava-white font-satoshi font-bold rounded-xl transition-colors flex justify-center items-center gap-2"
+                  >
+                    <Download size={16} /> Descargar
+                  </button>
+                </div>
+                <button 
+                  onClick={() => setSingleQrModal({ isOpen: false, step: 'choice', medium: null, qrDataUrl: null })}
+                  className="mt-1 text-center text-sm font-public font-bold text-fava-mediumgray hover:text-fava-darkgray"
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
+
           </div>
         </div>
       )}

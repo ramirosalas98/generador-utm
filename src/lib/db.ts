@@ -62,6 +62,7 @@ export type GeneratedLink = {
   utmUrl: string;
   bitlyUrl: string | null;
   hasQR: boolean;
+  qrSource?: 'bitly' | 'utm' | null;
   createdAt: number;
 };
 
