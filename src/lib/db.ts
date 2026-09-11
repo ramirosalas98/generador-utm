@@ -60,6 +60,7 @@ export type GeneratedLink = {
   medium: { id: string; name: string };
   tags: string[];
   utmUrl: string;
+  originalUrl?: string; // Link sin parámetros UTM
   bitlyUrl: string | null;
   hasQR: boolean;
   qrSource?: 'bitly' | 'utm' | null;

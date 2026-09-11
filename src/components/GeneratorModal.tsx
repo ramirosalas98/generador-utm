@@ -16,6 +16,13 @@ type GeneratorModalProps = {
   onClose: () => void;
   onSuccess: () => void;
   defaultMonth: string;
+  existingLinks?: any[];
+  initialData?: {
+    campaign?: string;
+    linkName?: string;
+    originalUrl?: string;
+    sourceName?: string;
+  };
 };
 
 type LinkEntry = {
@@ -39,7 +46,7 @@ type SourceModule = {
   newMediumInput: string;
 };
 
-export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMonth }: GeneratorModalProps) {
+export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMonth, existingLinks, initialData }: GeneratorModalProps) {
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
   
@@ -92,7 +99,9 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
     utms: any[];
     bitlys: number;
     qrs: number;
+    duplicates?: any[];
   } | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [copiedLinks, setCopiedLinks] = useState(false);
   const [copiedNames, setCopiedNames] = useState(false);
 
@@ -113,6 +122,7 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
       setGenerateBitly(false);
       setGenerateQR(false);
       setSuccessData(null);
+      setGenerateError(null);
       setPhase("form");
       setProgress(0);
       setTotalGenerations(0);
@@ -157,6 +167,31 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
       setDbMediums(mediums);
       setDbTags(tags);
       setDbLinks(links);
+
+      if (initialData) {
+        if (initialData.campaign) {
+          const fCamp = campaigns.find((c: any) => c.name === initialData.campaign);
+          setSelectedCampaigns([{ id: fCamp ? fCamp.id : "temp-"+Date.now(), name: initialData.campaign, isNew: !fCamp }]);
+        }
+        if (initialData.linkName || initialData.originalUrl) {
+          setLinkEntries([{ 
+            id: "temp-"+Date.now(), 
+            name: initialData.linkName || "Nuevo Link", 
+            url: initialData.originalUrl || "", 
+            isGeneric: false 
+          }]);
+        }
+        if (initialData.sourceName) {
+          const fSource = sources.find((s: any) => s.name === initialData.sourceName);
+          setSourceModules([{
+            id: "mod1",
+            sourceId: fSource ? fSource.id : "new",
+            newSourceName: fSource ? "" : initialData.sourceName,
+            saveNewSource: !fSource,
+            selectedMediums: [], newMediums: [], saveNewMediums: false, isAddingNewMedium: false, newMediumInput: ""
+          }]);
+        }
+      }
     } catch (error) {
       console.error(error);
     }
@@ -366,22 +401,9 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
         });
       }
 
-      // Calculate total generations for progress bar
-      let total = 0;
-      for (const link of linkEntries) {
-        for (const camp of selectedCampaigns) {
-          for (const mod of processedModules) {
-            total += mod.mediums.length;
-          }
-        }
-      }
-      setTotalGenerations(total);
-      setPhase("generating");
-      setProgress(0);
-
-      const createdUtms = [];
-      let bitlyCount = 0;
-      let qrCount = 0;
+      // 1. Gather all combinations and check for duplicates
+      const allCombinations: any[] = [];
+      const duplicates: any[] = [];
 
       for (const link of linkEntries) {
         // Build tags for this specific link
@@ -398,67 +420,110 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
           
           for (const mod of processedModules) {
             for (const med of mod.mediums) {
-              const url = new URL(link.url);
-              url.searchParams.set("utm_source", mod.sourceName);
-              url.searchParams.set("utm_medium", med.name);
-              url.searchParams.set("utm_campaign", finalCamp.name);
-              
               const key = `${mod.sourceName}-${med.name}`;
 
-              let bitlyUrl = null;
-              if (generateBitly && bitlySelections[key]) {
-                try {
-                  const token = await auth.currentUser?.getIdToken();
-                  const res = await fetch("/api/bitly", {
-                    method: "POST",
-                    headers: { 
-                      "Content-Type": "application/json",
-                      "Authorization": token ? `Bearer ${token}` : ""
-                    },
-                    body: JSON.stringify({
-                      long_url: url.toString(),
-                      title: `${finalCamp.name} - ${link.name} - ${mod.sourceName} - ${med.name}`
-                    })
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    bitlyUrl = data.link;
-                    bitlyCount++;
-                  }
-                } catch (e) {
-                  console.error("Error generating bitly", e);
-                }
+              // Check if combination already exists in existingLinks
+              const isDuplicate = existingLinks?.some(el => 
+                el.monthYear === finalMonthYear &&
+                el.campaign.name === finalCamp.name &&
+                el.linkName.name === link.name &&
+                el.source.name === mod.sourceName &&
+                el.medium.name === med.name
+              );
+
+              const combo = { link, linkTags, finalCamp, mod, med, key };
+              if (isDuplicate) {
+                duplicates.push(combo);
+              } else {
+                allCombinations.push(combo);
               }
-
-              const hasQR = generateQR && !!qrSelections[key];
-              if (hasQR) qrCount++;
-
-              const finalLink = {
-                monthYear: finalMonthYear,
-                campaign: finalCamp,
-                linkName: { id: link.isGeneric ? link.genericId! : "custom", name: link.name },
-                source: { id: mod.sourceId, name: mod.sourceName },
-                medium: { id: med.id, name: med.name },
-                tags: linkTags,
-                utmUrl: url.toString(),
-                bitlyUrl,
-                hasQR,
-                createdAt: Date.now()
-              };
-              
-              await saveGeneratedLink(finalLink);
-              createdUtms.push(finalLink);
-              setProgress(prev => prev + 1);
             }
           }
         }
       }
 
-      setSuccessData({ utms: createdUtms, bitlys: bitlyCount, qrs: qrCount });
+      if (allCombinations.length === 0) {
+        setGenerateError("Error: Todas las UTMs que intentás generar ya existen en este mes.");
+        setLoading(false);
+        return;
+      }
+
+      setGenerateError(null);
+      setTotalGenerations(allCombinations.length);
+      setPhase("generating");
+      setProgress(0);
+
+      const createdUtms = [];
+      let bitlyCount = 0;
+      let qrCount = 0;
+
+      for (const combo of allCombinations) {
+        const { link, linkTags, finalCamp, mod, med, key } = combo;
+
+        if (!link.url || !link.url.startsWith("http")) {
+          setGenerateError(`El enlace "${link.name}" no tiene una URL válida (debe empezar con http:// o https://).`);
+          setLoading(false);
+          setPhase("form");
+          return;
+        }
+
+        const url = new URL(link.url);
+        url.searchParams.set("utm_source", mod.sourceName);
+        url.searchParams.set("utm_medium", med.name);
+        url.searchParams.set("utm_campaign", finalCamp.name);
+
+        let bitlyUrl = null;
+        if (generateBitly && bitlySelections[key]) {
+          try {
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch("/api/bitly", {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                "Authorization": token ? `Bearer ${token}` : ""
+              },
+              body: JSON.stringify({
+                long_url: url.toString(),
+                title: `${finalCamp.name} - ${link.name} - ${mod.sourceName} - ${med.name}`
+              })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              bitlyUrl = data.link;
+              bitlyCount++;
+            }
+          } catch (e) {
+            console.error("Error generating bitly", e);
+          }
+        }
+
+        const hasQR = generateQR && !!qrSelections[key];
+        if (hasQR) qrCount++;
+
+        const finalLink = {
+          monthYear: finalMonthYear,
+          campaign: finalCamp,
+          linkName: { id: link.isGeneric ? link.genericId! : "custom", name: link.name },
+          source: { id: mod.sourceId, name: mod.sourceName },
+          medium: { id: med.id, name: med.name },
+          tags: linkTags,
+          utmUrl: url.toString(),
+          originalUrl: link.url,
+          bitlyUrl,
+          hasQR,
+          createdAt: Date.now()
+        };
+        
+        await saveGeneratedLink(finalLink);
+        createdUtms.push(finalLink);
+        setProgress(prev => prev + 1);
+      }
+
+      setSuccessData({ utms: createdUtms, bitlys: bitlyCount, qrs: qrCount, duplicates });
       setPhase("success");
     } catch (error) {
       console.error(error);
-      alert("Hubo un error al generar los enlaces.");
+      setGenerateError("Hubo un error interno al generar los enlaces.");
       setPhase("form");
     }
     setLoading(false);
@@ -564,6 +629,20 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
                   .
                 </p>
               </div>
+
+              {successData.duplicates && successData.duplicates.length > 0 && (
+                <div className="w-full text-left bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm font-public">
+                  <strong className="block mb-2 text-yellow-900">Atención: se omitieron {successData.duplicates.length} UTM(s) porque ya existían en este mes:</strong>
+                  <ul className="list-disc pl-5 space-y-1 text-yellow-700">
+                    {successData.duplicates.slice(0, 5).map((d, i) => (
+                      <li key={i}>{d.finalCamp.name} &gt; {d.link.name} &gt; {d.mod.sourceName} &gt; {d.med.name}</li>
+                    ))}
+                  </ul>
+                  {successData.duplicates.length > 5 && (
+                    <p className="mt-2 text-yellow-700 font-bold italic">...y otros {successData.duplicates.length - 5} más.</p>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-col gap-3 w-full mt-4">
                 <button onClick={() => handleCopyLinks(true)} className={`w-full py-3 px-4 border rounded-xl font-satoshi font-bold transition-all flex items-center justify-center gap-2 ${copiedLinks ? 'bg-green-100 border-green-500 text-green-700' : 'bg-fava-lightgray/20 border-fava-lightgray hover:border-fava-mediumgray text-fava-darkgray'}`}>
@@ -1105,17 +1184,25 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-5 border-t border-fava-lightgray bg-fava-white sticky bottom-0 z-10 flex justify-end items-center gap-4">
-          <button onClick={onClose} className="px-6 py-2.5 font-satoshi font-bold text-fava-mediumgray hover:text-fava-darkgray transition-colors">
-            Cancelar
-          </button>
-          <button 
-            onClick={handleGenerate}
-            disabled={!canGenerate || loading}
-            className="bg-fava-red hover:bg-fava-darkred text-fava-white font-satoshi font-bold px-8 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgba(229,41,41,0.3)] disabled:opacity-50 disabled:shadow-none"
-          >
-            <Check size={20} /> Generar UTM
-          </button>
+        <div className="px-8 py-5 border-t border-fava-lightgray bg-fava-white sticky bottom-0 z-10 flex flex-col gap-4">
+          {generateError && (
+            <div className="w-full bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm font-public">
+              <strong className="block mb-1">Error</strong>
+              {generateError}
+            </div>
+          )}
+          <div className="flex justify-end items-center gap-4">
+            <button onClick={onClose} className="px-6 py-2.5 font-satoshi font-bold text-fava-mediumgray hover:text-fava-darkgray transition-colors">
+              Cancelar
+            </button>
+            <button 
+              onClick={handleGenerate}
+              disabled={!canGenerate || loading}
+              className="bg-fava-red hover:bg-fava-darkred text-fava-white font-satoshi font-bold px-8 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgba(229,41,41,0.3)] disabled:opacity-50 disabled:shadow-none"
+            >
+              <Check size={20} /> Generar UTM
+            </button>
+          </div>
         </div>
 
       </div>

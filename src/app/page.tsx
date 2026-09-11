@@ -87,6 +87,7 @@ const InlineCopyButton = ({ text }: { text: string }) => {
 export default function Dashboard() {
   const [linksData, setLinksData] = useState<GeneratedLink[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalInitialData, setModalInitialData] = useState<{ campaign?: string; linkName?: string; originalUrl?: string; sourceName?: string } | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "generic">("month");
 
@@ -600,7 +601,10 @@ export default function Dashboard() {
               <div className="flex-1 flex items-center justify-between cursor-pointer" onClick={() => toggleExpand(setExpandedCampaigns, campaign.id)}>
                 <div className="flex flex-col">
                   <span className="text-xs font-public font-bold text-fava-mediumgray uppercase tracking-wider">Campaign</span>
-                  <span className="text-lg font-satoshi font-bold text-fava-darkgray">{campaign.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-satoshi font-bold text-fava-darkgray">{campaign.name}</span>
+                    <button onClick={(e) => { e.stopPropagation(); setModalInitialData({ campaign: campaign.name }); setIsModalOpen(true); }} className="text-fava-mediumgray hover:text-fava-red transition-colors" title="Generar link en esta campaña"><Plus size={16} /></button>
+                  </div>
                 </div>
                 <ChevronRight className={`text-fava-mediumgray transition-transform ${expandedCampaigns.includes(campaign.id) ? 'rotate-90' : ''}`} size={20} />
               </div>
@@ -622,7 +626,16 @@ export default function Dashboard() {
                       <div className="flex-1 flex items-center justify-between cursor-pointer" onClick={() => toggleExpand(setExpandedLinks, link.id)}>
                         <div className="flex flex-col">
                           <span className="text-[10px] font-public font-bold text-fava-mediumgray uppercase tracking-wider">Link</span>
-                          <span className="font-satoshi font-bold text-fava-darkgray">{link.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-satoshi font-bold text-fava-darkgray">{link.name}</span>
+                            <button onClick={(e) => { 
+                              e.stopPropagation(); 
+                              const firstMedium = link.sources?.[0]?.mediums?.[0];
+                              const origUrl = firstMedium?.originalUrl || firstMedium?.utm?.split('?')[0];
+                              setModalInitialData({ campaign: campaign.name, linkName: link.name, originalUrl: origUrl }); 
+                              setIsModalOpen(true); 
+                            }} className="text-fava-mediumgray hover:text-fava-red transition-colors" title="Generar link en este enlace"><Plus size={14} /></button>
+                          </div>
                         </div>
                         <ChevronRight className={`text-fava-mediumgray transition-transform ${expandedLinks.includes(link.id) ? 'rotate-90' : ''}`} size={18} />
                       </div>
@@ -644,7 +657,16 @@ export default function Dashboard() {
                               <div className="flex-1 flex items-center justify-between cursor-pointer" onClick={() => toggleExpand(setExpandedSources, source.id)}>
                                 <div className="flex flex-col">
                                   <span className="text-[10px] font-public font-bold text-fava-mediumgray uppercase tracking-wider">Source</span>
-                                  <span className="text-sm font-satoshi font-bold text-fava-darkgray">{source.name}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-satoshi font-bold text-fava-darkgray">{source.name}</span>
+                                    <button onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      const firstMedium = source.mediums?.[0];
+                                      const origUrl = firstMedium?.originalUrl || firstMedium?.utm?.split('?')[0];
+                                      setModalInitialData({ campaign: campaign.name, linkName: link.name, sourceName: source.name, originalUrl: origUrl }); 
+                                      setIsModalOpen(true); 
+                                    }} className="text-fava-mediumgray hover:text-fava-red transition-colors" title="Generar link en esta fuente"><Plus size={14} /></button>
+                                  </div>
                                 </div>
                                 <ChevronRight className={`text-fava-mediumgray transition-transform ${expandedSources.includes(source.id) ? 'rotate-90' : ''}`} size={16} />
                               </div>
@@ -915,9 +937,11 @@ export default function Dashboard() {
 
       <GeneratorModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={() => setIsModalOpen(false)} 
+        onClose={() => { setIsModalOpen(false); setModalInitialData(null); }} 
+        onSuccess={() => { setIsModalOpen(false); setModalInitialData(null); }} 
         defaultMonth={selectedMonthLabel}
+        existingLinks={linksData}
+        initialData={modalInitialData || undefined}
       />
     </div>
   );
