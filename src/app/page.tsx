@@ -84,6 +84,32 @@ const InlineCopyButton = ({ text }: { text: string }) => {
   );
 };
 
+const ExpandableUrl = ({ url }: { url: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const MAX_LEN = 30;
+  const isLong = url.length > MAX_LEN;
+
+  return (
+    <div className="flex items-start flex-1 flex-wrap">
+      <span 
+        onClick={(e) => {
+          if (isLong) {
+            e.stopPropagation();
+            setExpanded(!expanded);
+          }
+        }}
+        className={`text-xs font-public transition-colors ${isLong ? 'cursor-pointer hover:text-fava-darkgray' : ''} ${expanded ? 'text-fava-darkgray break-all mt-1' : 'text-fava-mediumgray mt-1'} mr-1`} 
+        title={isLong && !expanded ? "Click para expandir" : url}
+      >
+        {!expanded && isLong ? url.slice(0, MAX_LEN) + '...' : url}
+      </span>
+      <div className="flex-shrink-0">
+        <InlineCopyButton text={url} />
+      </div>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const [linksData, setLinksData] = useState<GeneratedLink[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -690,39 +716,31 @@ export default function Dashboard() {
 
                                     {/* UTM */}
                                     {(filterType.length === 0 || filterType.includes("UTM")) && (
-                                      <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
+                                      <div className="flex items-start gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
                                         <input 
                                           type="checkbox" 
-                                          className="w-4 h-4 accent-fava-red cursor-pointer"
+                                          className="w-4 h-4 accent-fava-red cursor-pointer mt-1"
                                           checked={selectedItems.includes(medium.id)}
                                           onChange={() => toggleSelect(medium.id)}
                                         />
-                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">UTM</span>
-                                        <span className="text-xs font-public text-fava-mediumgray truncate group-hover:text-fava-darkgray transition-colors flex-1" title={medium.utm}>
-                                          {medium.utm}
-                                        </span>
-                                        <InlineCopyButton text={medium.utm} />
+                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase mt-1">UTM</span>
+                                        <ExpandableUrl url={medium.utm} />
                                       </div>
                                     )}
 
                                     {/* BITLY */}
                                     {(filterType.length === 0 || filterType.includes("Bitly")) && (
-                                      <div className="flex items-center gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
+                                      <div className="flex items-start gap-3 bg-fava-lightgray/5 p-2 rounded-lg group">
                                         <input 
                                           type="checkbox" 
-                                          className="w-4 h-4 accent-fava-red cursor-pointer"
+                                          className="w-4 h-4 accent-fava-red cursor-pointer mt-1"
                                           checked={selectedItems.includes(`${medium.id}-bitly`)}
                                           onChange={() => toggleSelect(`${medium.id}-bitly`)}
                                           disabled={!medium.bitly}
                                         />
-                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase">Bitly</span>
+                                        <span className="text-[10px] font-public font-bold text-fava-darkgray w-10 uppercase mt-1">Bitly</span>
                                         {medium.bitly ? (
-                                          <>
-                                            <span className="text-xs font-public text-fava-mediumgray truncate group-hover:text-fava-darkgray transition-colors flex-1" title={medium.bitly}>
-                                              {medium.bitly}
-                                            </span>
-                                            <InlineCopyButton text={medium.bitly} />
-                                          </>
+                                          <ExpandableUrl url={medium.bitly} />
                                         ) : (
                                           <div className="flex-1">
                                             <button onClick={() => handleGenerateBitly(medium, campaign.name, link.name, source.name)} className="px-3 py-1 border border-dashed border-fava-lightgray rounded font-public font-semibold text-[10px] text-fava-darkgray hover:bg-fava-lightgray/20 transition-colors flex items-center gap-1">
