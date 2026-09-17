@@ -101,7 +101,7 @@ server.tool(
     monthYear: z.string().optional().describe("Mes y año contable (ej. 'Sep 2026'). Por defecto toma el mes actual"),
     allowDuplicate: z.boolean().optional().default(false).describe("Si es true, permite duplicar el link si ya existía en el mismo mes"),
   },
-  async (params) => {
+  async (params: any) => {
     const configCheck = checkConfig();
     if (!configCheck.ok) {
       return {
@@ -183,7 +183,7 @@ server.tool(
     campaign: z.string().optional().describe("Filtrar por nombre de campaña"),
     limit: z.number().optional().default(20).describe("Cantidad máxima de enlaces a recuperar"),
   },
-  async (params) => {
+  async (params: any) => {
     const configCheck = checkConfig();
     if (!configCheck.ok) {
       return {

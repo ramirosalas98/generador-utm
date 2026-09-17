@@ -113,11 +113,11 @@ export async function POST(request: Request) {
         ) ||
         dbGenericLinks.find((l) => {
           const lName = l.name.toLowerCase();
-          return searchWords.every((w) => lName.includes(w));
+          return searchWords.every((w: string) => lName.includes(w));
         }) ||
         dbGenericLinks.find((l) => {
           const lName = l.name.toLowerCase();
-          return searchWords.some((w) => lName.includes(w));
+          return searchWords.some((w: string) => lName.includes(w));
         });
 
       if (match) {
