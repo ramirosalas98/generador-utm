@@ -9,10 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "file-saver": "^2.0.5",
     "firebase": "^12.18.0",
+    "firebase-admin": "^14.4.0",
     "jose": "^6.2.12",
     "jszip": "^3.10.1",
     "lucide-react": "^1.42.0",

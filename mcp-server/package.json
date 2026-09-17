@@ -1,0 +1,28 @@
+{
+  "name": "fava-utm-mcp-server",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) Server para Generador de UTM y Bitly de Fava",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "fava-utm-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "keywords": ["mcp", "utm", "fava", "bitly"],
+  "author": "Fava Marketing Team",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

@@ -237,32 +237,59 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
 
   if (!isOpen) return null;
 
+  // Helper to extract a friendly title from URL immediately while fetching
+  const getInitialSlugTitle = (u: string) => {
+    try {
+      const parsed = new URL(u);
+      const segs = parsed.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+      if (!segs.length) return parsed.hostname.replace(/^www\./, "");
+      const last = decodeURIComponent(segs[segs.length - 1]).replace(/\.[a-z0-9]+$/i, "");
+      const words = last.replace(/[-_]+/g, " ").trim();
+      return words ? words.replace(/\b\w/g, c => c.toUpperCase()) : parsed.hostname;
+    } catch {
+      return u;
+    }
+  };
+
   // --- LÓGICA DE LINKS ---
   const handleAddCustomLinks = async () => {
     if (!customLinksText.trim()) return;
-    setIsFetchingTitles(true);
     const urls = customLinksText.split(/[\t,\n\s]+/).map(u => u.trim()).filter(u => u.startsWith("http"));
-    
-    const newEntries: LinkEntry[] = [];
-    for (const url of urls) {
-      let title = url;
-      try {
-        const res = await fetch(`/api/fetch-title?url=${encodeURIComponent(url)}`);
-        const data = await res.json();
-        if (data.title) title = data.title;
-      } catch(e) {}
+    if (urls.length === 0) return;
 
-      newEntries.push({
-        id: Math.random().toString(36).substr(2, 9),
-        url,
-        name: title,
-        isGeneric: false
-      });
-    }
+    // 1. Insertamos inmediatamente los links en linkEntries para que estén disponibles sin demora
+    const newEntries: LinkEntry[] = urls.map(url => ({
+      id: Math.random().toString(36).substr(2, 9),
+      url,
+      name: getInitialSlugTitle(url),
+      isGeneric: false,
+      isRetrying: true
+    }));
 
     setLinkEntries(prev => [...prev, ...newEntries]);
     setCustomLinksText("");
-    setIsFetchingTitles(false);
+    setIsFetchingTitles(true);
+
+    // 2. En paralelo y sin bloquear la UI, consultamos los títulos reales
+    try {
+      await Promise.allSettled(
+        newEntries.map(async entry => {
+          try {
+            const res = await fetch(`/api/fetch-title?url=${encodeURIComponent(entry.url)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.title && data.title !== entry.url) {
+                setLinkEntries(prev => prev.map(l => l.id === entry.id ? { ...l, name: data.title, isRetrying: false } : l));
+                return;
+              }
+            }
+          } catch(e) {}
+          setLinkEntries(prev => prev.map(l => l.id === entry.id ? { ...l, isRetrying: false } : l));
+        })
+      );
+    } finally {
+      setIsFetchingTitles(false);
+    }
   };
 
   const handleAddGenericLink = (id: string) => {
@@ -756,14 +783,15 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
                     />
                     <span className="flex-[2] text-sm font-public text-fava-mediumgray truncate" title={link.url}>{link.url}</span>
                     <div className="flex items-center gap-1">
-                      {!link.isGeneric && (link.name === link.url || link.url.includes(link.name)) && (
+                      {!link.isGeneric && (
                         <button 
+                          type="button"
                           onClick={() => retryFetchTitle(link.id, link.url)} 
                           disabled={link.isRetrying}
                           title="Volver a buscar título"
                           className="p-2 text-fava-mediumgray hover:text-fava-blue hover:bg-fava-blue/10 rounded-md transition-colors disabled:opacity-50"
                         >
-                          <RefreshCw size={16} className={link.isRetrying ? "animate-spin" : ""} />
+                          <RefreshCw size={16} className={link.isRetrying ? "animate-spin text-fava-red" : ""} />
                         </button>
                       )}
                       <button onClick={() => removeLink(link.id)} title="Quitar link" className="p-2 text-fava-mediumgray hover:text-fava-red hover:bg-fava-lightred/20 rounded-md transition-colors">
@@ -1019,54 +1047,86 @@ export default function GeneratorModal({ isOpen, onClose, onSuccess, defaultMont
               </label>
             )}
             
-            {(selectedTags.length > 0 || newTags.length > 0) && linkEntries.length > 1 && (
-              <div className="mt-2 p-4 bg-fava-lightgray/10 border border-fava-lightgray rounded-xl">
-                <button onClick={() => setAdvancedTagsOpen(!advancedTagsOpen)} className="flex items-center justify-between w-full text-sm font-public font-bold text-fava-darkgray hover:text-fava-red transition-colors">
+            {/* Configuración avanzada de Etiquetas */}
+            <div className="mt-2 p-4 bg-fava-lightgray/10 border border-fava-lightgray rounded-xl">
+              <button 
+                type="button"
+                onClick={() => setAdvancedTagsOpen(!advancedTagsOpen)} 
+                className="flex items-center justify-between w-full text-sm font-public font-bold text-fava-darkgray hover:text-fava-red transition-colors"
+              >
+                <div className="flex items-center gap-2">
                   <span>Configuración avanzada de Etiquetas</span>
-                  <ChevronDown size={16} className={`transition-transform ${advancedTagsOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {advancedTagsOpen && (
-                  <div className="mt-4 flex flex-col gap-4 border-t border-fava-lightgray pt-4">
-                    <div className="flex items-center gap-2">
-                       <label className="text-sm font-public text-fava-mediumgray">Configurar etiqueta:</label>
-                       <select 
-                         value={activeAdvancedTag || ""}
-                         onChange={e => setActiveAdvancedTag(e.target.value)}
-                         className="px-3 py-1.5 border border-fava-lightgray rounded text-sm outline-none bg-white font-public text-fava-darkgray focus:border-fava-red"
-                       >
-                         {activeAdvancedTag === null && <option value="" disabled>Elegí una etiqueta...</option>}
-                         {[...selectedTags.map(id => ({ id, name: dbTags.find(t=>t.id===id)?.name })), ...newTags.map(name => ({ id: name, name }))].map(t => (
-                           <option key={t.id} value={t.id}>{t.name}</option>
-                         ))}
-                       </select>
-                    </div>
+                  {(selectedTags.length > 0 || newTags.length > 0) && (
+                    <span className="text-xs font-public font-normal bg-fava-red/10 text-fava-red px-2 py-0.5 rounded-full">
+                      {selectedTags.length + newTags.length} seleccionada{(selectedTags.length + newTags.length) > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${advancedTagsOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-                    {activeAdvancedTag && tagLinkSelections[activeAdvancedTag] && (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-xs font-public text-fava-mediumgray mb-1">Seleccioná a qué links se les aplicará esta etiqueta:</p>
-                        {linkEntries.map(l => (
-                          <label key={l.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-fava-lightgray/20 rounded-lg">
-                            <input 
-                              type="checkbox" 
-                              checked={tagLinkSelections[activeAdvancedTag][l.id]} 
-                              onChange={e => setTagLinkSelections(prev => ({
-                                ...prev, 
-                                [activeAdvancedTag]: { ...prev[activeAdvancedTag], [l.id]: e.target.checked }
-                              }))} 
-                              className="w-4 h-4 accent-fava-red" 
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-satoshi font-bold text-fava-darkgray">{l.name}</span>
-                              <span className="text-xs font-public text-fava-mediumgray truncate max-w-lg">{l.url}</span>
-                            </div>
-                          </label>
-                        ))}
+              {advancedTagsOpen && (
+                <div className="mt-4 flex flex-col gap-4 border-t border-fava-lightgray pt-4">
+                  {!(selectedTags.length > 0 || newTags.length > 0) ? (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs font-public text-amber-800">
+                      💡 Seleccioná al menos una etiqueta arriba para configurar a qué enlaces querés aplicarla.
+                    </div>
+                  ) : linkEntries.length <= 1 ? (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs font-public text-blue-800">
+                      ℹ️ Tenés {linkEntries.length === 0 ? "0 enlaces cargados" : "1 solo enlace cargado"}. Esta configuración permite asignar etiquetas de forma diferenciada cuando agregás 2 o más enlaces en el paso 1.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                         <label className="text-sm font-public text-fava-mediumgray">Configurar etiqueta:</label>
+                         <select 
+                           value={activeAdvancedTag || ""}
+                           onChange={e => setActiveAdvancedTag(e.target.value)}
+                           className="px-3 py-1.5 border border-fava-lightgray rounded text-sm outline-none bg-white font-public text-fava-darkgray focus:border-fava-red"
+                         >
+                           {activeAdvancedTag === null && <option value="" disabled>Elegí una etiqueta...</option>}
+                           {[...selectedTags.map(id => ({ id, name: dbTags.find(t=>t.id===id)?.name || id })), ...newTags.map(name => ({ id: name, name }))].map(t => (
+                             <option key={t.id} value={t.id}>{t.name}</option>
+                           ))}
+                         </select>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+
+                      {activeAdvancedTag && (
+                        <div className="flex flex-col gap-2">
+                          <p className="text-xs font-public text-fava-mediumgray mb-1">Seleccioná a qué links se les aplicará esta etiqueta:</p>
+                          {linkEntries.map(l => {
+                            const isChecked = tagLinkSelections[activeAdvancedTag]?.[l.id] !== false;
+                            return (
+                              <label key={l.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-fava-lightgray/20 rounded-lg transition-colors">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked} 
+                                  onChange={e => {
+                                    const val = e.target.checked;
+                                    setTagLinkSelections(prev => ({
+                                      ...prev, 
+                                      [activeAdvancedTag]: { 
+                                        ...(prev[activeAdvancedTag] || {}), 
+                                        [l.id]: val 
+                                      }
+                                    }));
+                                  }} 
+                                  className="w-4 h-4 accent-fava-red" 
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-satoshi font-bold text-fava-darkgray">{l.name}</span>
+                                  <span className="text-xs font-public text-fava-mediumgray truncate max-w-lg">{l.url}</span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 5. Opciones Adicionales */}
